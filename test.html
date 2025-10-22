@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cron Dashboard</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#9aa4b2; --accent:#3b82f6; --danger:#ef4444;
+      --glass: rgba(255,255,255,0.03);
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    html,body{height:100%; margin:0; background:linear-gradient(180deg,#071025 0%, #071633 100%); color:#e6eef6;}
+    .container{max-width:1100px; margin:28px auto; padding:20px;}
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;}
+    .logo{display:flex;gap:12px;align-items:center}
+    .logo .dot{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#60a5fa);display:inline-block}
+    h1{font-size:20px;margin:0}
+    .grid{display:grid;grid-template-columns:1fr 380px; gap:16px;}
+    .card{background:var(--card); border-radius:12px; padding:14px; box-shadow:0 6px 18px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.03);}
+    label{display:block;font-size:13px;color:var(--muted); margin-bottom:6px}
+    input, textarea, select, button{width:100%; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:inherit; box-sizing:border-box}
+    textarea{min-height:80px; resize:vertical}
+    .jobs-list{max-height:420px; overflow:auto; margin-top:8px}
+    .job{display:flex;align-items:flex-start; gap:10px; padding:10px; border-radius:8px; background:var(--glass); margin-bottom:10px}
+    .job .meta{flex:1}
+    .small{font-size:12px; color:var(--muted)}
+    .btn{display:inline-block;padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#062033;font-weight:600;cursor:pointer}
+    .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06); color:var(--muted); font-weight:500}
+    .btn.danger{background:var(--danger); color:#fff}
+    .row{display:flex; gap:8px; align-items:center}
+    .log{white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Helvetica Neue", monospace; font-size:13px; color:#d8e8ff; max-height:360px; overflow:auto; padding:10px; border-radius:8px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))}
+    footer{margin-top:14px; font-size:12px; color:var(--muted)}
+    @media (max-width:920px){ .grid{grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <span class="dot" aria-hidden></span>
+        <div>
+          <h1>Cron Dashboard</h1>
+          <div class="small">View, schedule, run and manage cron jobs</div>
+        </div>
+      </div>
+      <div>
+        <button id="refreshAll" class="btn secondary">Refresh</button>
+        <button id="openLogs" class="btn">Show Logs</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Left: Jobs & Add job -->
+      <div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong>Scheduled Jobs</strong>
+            <span class="small" id="jobsCount">0 jobs</span>
+          </div>
+
+          <div class="jobs-list" id="jobsList">
+            <!-- jobs injected here -->
+          </div>
+
+          <hr style="border:none;height:1px;background:rgba(255,255,255,0.03); margin:12px 0">
+
+          <div>
+            <strong>Add / Update Job</strong>
+            <div class="small" style="margin-bottom:8px">Provide a cron expression or simple schedule and the command to run.</div>
+
+            <form id="addJobForm" onsubmit="return false;">
+              <label for="jobName">Name</label>
+              <input id="jobName" placeholder="Short job name (e.g., backup-db)">
+
+              <label for="cronExpr">Cron expression (or 'every 5m', 'daily 02:00')</label>
+              <input id="cronExpr" placeholder="e.g. */5 * * * * or daily 02:00">
+
+              <label for="cmd">Command / Script</label>
+              <textarea id="cmd" placeholder="/usr/bin/python3 /home/ashish/scripts/backup.py"></textarea>
+
+              <div style="display:flex;gap:8px;margin-top:10px">
+                <button id="addJobBtn" class="btn">Add Job</button>
+                <button id="clearFormBtn" class="btn secondary" type="button">Clear</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Log viewer -->
+      <div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong>Execution Log</strong>
+            <div class="row">
+              <button id="downloadLogBtn" class="btn secondary">Download</button>
+              <button id="clearLogBtn" class="btn danger">Clear log</button>
+            </div>
+          </div>
+
+          <div id="logContainer" class="log" style="margin-top:12px; min-height:160px;">
+            Loading logs...
+          </div>
+
+          <footer>
+            <div class="small">Note: This UI talks to server endpoints: <code>/api/jobs</code>, <code>/api/jobs/{id}/run</code>, <code>/api/jobs/{id}</code>, <code>/api/logs</code>, <code>/api/logs/clear</code>. Adjust as needed.</div>
+          </footer>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Helper for JSON fetch with error handling
+    async function api(path, opts = {}) {
+      const res = await fetch(path, {
+        headers: {'Content-Type':'application/json'},
+        credentials: 'same-origin',
+        ...opts
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(()=>res.statusText);
+        throw new Error('API error: ' + res.status + ' - ' + text);
+      }
+      if (res.status === 204) return null;
+      const ct = res.headers.get('content-type') || '';
+      return ct.includes('application/json') ? res.json() : res.text();
+    }
+
+    // Render jobs
+    async function loadJobs(){
+      const list = document.getElementById('jobsList');
+      const count = document.getElementById('jobsCount');
+      list.innerHTML = '<div class="small">Loading jobs...</div>';
+      try {
+        const jobs = await api('/api/jobs');
+        count.textContent = jobs.length + ' job' + (jobs.length !== 1 ? 's' : '');
+        if (!jobs.length) {
+          list.innerHTML = '<div class="small">No jobs scheduled yet.</div>';
+          return;
+        }
+        list.innerHTML = '';
+        jobs.forEach(j => {
+          const el = document.createElement('div');
+          el.className = 'job';
+          el.innerHTML = `
+            <div class="meta">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <div>
+                  <div style="font-weight:600">${escapeHtml(j.name || j.id)}</div>
+                  <div class="small">${escapeHtml(j.expression || j.schedule || '—')}</div>
+                </div>
+                <div class="small">${escapeHtml(j.next_run || '')}</div>
+              </div>
+              <div class="small" style="margin-top:8px">${escapeHtml(j.command || '')}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <button class="btn" onclick="runJob('${j.id}')">Run</button>
+              <button class="btn secondary" onclick="editJob('${j.id}')">Edit</button>
+              <button class="btn danger" onclick="deleteJob('${j.id}')">Delete</button>
+            </div>
+          `;
+          list.appendChild(el);
+        });
+      } catch (err) {
+        list.innerHTML = '<div class="small" style="color:var(--danger)">'+escapeHtml(err.message)+'</div>';
+        count.textContent = '0 jobs';
+      }
+    }
+
+    // Load logs
+    async function loadLogs(){
+      const el = document.getElementById('logContainer');
+      el.textContent = 'Loading logs...';
+      try {
+        const logs = await api('/api/logs'); // returns plain text or array
+        if (typeof logs === 'string') {
+          el.textContent = logs || '(empty)';
+        } else if (Array.isArray(logs)) {
+          el.textContent = logs.join('\\n');
+        } else {
+          el.textContent = JSON.stringify(logs, null, 2);
+        }
+      } catch (err) {
+        el.textContent = 'Error loading logs: ' + err.message;
+      }
+    }
+
+    // Add job
+    document.getElementById('addJobBtn').addEventListener('click', async () => {
+      const name = document.getElementById('jobName').value.trim();
+      const expr = document.getElementById('cronExpr').value.trim();
+      const cmd = document.getElementById('cmd').value.trim();
+      if (!expr || !cmd) return alert('Please provide schedule and command.');
+      const payload = { name, expression: expr, command: cmd };
+      try {
+        await api('/api/jobs', { method:'POST', body: JSON.stringify(payload) });
+        document.getElementById('addJobForm').reset();
+        await loadJobs();
+      } catch (err) {
+        alert('Failed to add job: ' + err.message);
+      }
+    });
+
+    document.getElementById('clearFormBtn').addEventListener('click', ()=> document.getElementById('addJobForm').reset());
+
+    // Run job now
+    async function runJob(id){
+      if (!confirm('Run job now?')) return;
+      try {
+        await api(`/api/jobs/${encodeURIComponent(id)}/run`, { method:'POST' });
+        alert('Triggered job run.');
+        loadLogs();
+      } catch (err) { alert('Failed: ' + err.message); }
+    }
+
+    // Delete
+    async function deleteJob(id){
+      if (!confirm('Delete this job?')) return;
+      try {
+        await api(`/api/jobs/${encodeURIComponent(id)}`, { method:'DELETE' });
+        await loadJobs();
+      } catch (err) { alert('Delete failed: ' + err.message); }
+    }
+
+    // Edit: fetch and fill form (basic)
+    async function editJob(id){
+      try {
+        const job = await api(`/api/jobs/${encodeURIComponent(id)}`);
+        document.getElementById('jobName').value = job.name || '';
+        document.getElementById('cronExpr').value = job.expression || job.schedule || '';
+        document.getElementById('cmd').value = job.command || '';
+        window.scrollTo({top:0, behavior:'smooth'});
+      } catch (err) { alert('Could not load job: ' + err.message); }
+    }
+
+    // Clear logs
+    document.getElementById('clearLogBtn').addEventListener('click', async () => {
+      if (!confirm('Clear all logs?')) return;
+      try {
+        await api('/api/logs/clear', { method:'POST' });
+        loadLogs();
+      } catch (err) { alert('Clear failed: ' + err.message); }
+    });
+
+    // Download log
+    document.getElementById('downloadLogBtn').addEventListener('click', () => {
+      window.location = '/api/logs/download';
+    });
+
+    // Refresh
+    document.getElementById('refreshAll').addEventListener('click', () => { loadJobs(); loadLogs(); });
+    document.getElementById('openLogs').addEventListener('click', () => { document.getElementById('logContainer').scrollIntoView({behavior:'smooth'}); });
+
+    // Small helpers
+    function escapeHtml(s){ if (s==null) return ''; return String(s).replace(/[&<>"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]); }
+
+    // Initial load
+    (function init(){
+      loadJobs();
+      loadLogs();
+      // auto-refresh logs every 15s (optional)
+      setInterval(loadLogs, 15000);
+    })();
+  </script>
+</body>
+</html>
+

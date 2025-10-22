@@ -1,0 +1,6 @@
+SHELL=/bin/sh
+PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/usr/local/sbin
+MAILTO=""
+
+32 12 * python3 /home/ashish/cron_dashboard/scripts/python_script.py >> /home/ashish/cron_dashboard/logfile.txt2>&1 >> /home/ashish/cron_dashboard/anacron_output.log 2>&1
+33 21 * python3 /home/ashish/cron_dashboard/scripts/python_script.py >> /home/ashish/cron_dashboard/logfile.txt2>&1 >> /home/ashish/cron_dashboard/anacron_output.log 2>&1

@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 stat-card">
+            <div class="card-body text-center card-gradient-primary">
+                <h3 class="text-white">{{ total_jobs }}</h3>
+                <p class="text-white mb-0">Total Jobs</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 stat-card">
+            <div class="card-body text-center card-gradient-success">
+                <h3 class="text-white">{{ success_count }}</h3>
+                <p class="text-white mb-0">Successful Runs</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 stat-card">
+            <div class="card-body text-center card-gradient-warning">
+                <h3 class="text-white">{{ failure_count }}</h3>
+                <p class="text-white mb-0">Failed Runs</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4 job-card">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-clock me-1"></i> Scheduled Jobs ({{ jobs|length }})</span>
+        <a href="{{ url_for('add_job') }}" class="btn btn-sm btn-light">
+            <i class="fas fa-plus me-1"></i>Add Job
+        </a>
+    </div>
+    <div class="card-body p-0">
+        {% if jobs %}
+        <table class="table table-dark table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Schedule</th>
+                    <th>Command</th>
+                    <th>Anacron Days</th>
+                    <th class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in jobs %}
+                <tr>
+                    <td>{{ job.id }}</td>
+                    <td><code>{{ job.schedule }}</code></td>
+                    <td><code>{{ job.command }}</code></td>
+                    <td><span class="badge bg-info">{{ job.anacron_days }} day(s)</span></td>
+                    <td class="text-center">
+                        <a href="{{ url_for('delete_job', job_id=job.id) }}" class="btn btn-sm btn-danger"
+                           onclick="return confirm('Delete job #{{ job.id }}?')">
+                           <i class="fas fa-trash-alt me-1"></i>Delete
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-5">
+            <i class="fas fa-inbox fa-3x mb-3"></i>
+            <h5>No jobs scheduled yet</h5>
+            <p>Get started by adding your first anacron job</p>
+            <a href="{{ url_for('add_job') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>Add Your First Job
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4 job-card">
+    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-terminal me-1"></i> Live Terminal Output</span>
+        <div>
+            <button class="btn btn-sm btn-warning me-2" onclick="clearLogs()">
+                <i class="fas fa-broom me-1"></i>Clear Logs
+            </button>
+            <a href="{{ url_for('test_anacron') }}" class="btn btn-sm btn-info">
+                <i class="fas fa-vial me-1"></i>Test Anacron
+            </a>
+        </div>
+    </div>
+    <div class="card-body terminal" id="outputBox" style="height:300px;overflow-y:auto;font-family:Consolas,monospace;font-size:14px;">
+        {% for log in logs %}
+            {% if '❌' in log or 'error' in log.lower() %}
+                <span class="text-danger">{{ log }}</span><br>
+            {% elif '✅' in log or 'success' in log.lower() %}
+                <span class="text-success">{{ log }}</span><br>
+            {% else %}
+                {{ log }}<br>
+            {% endif %}
+        {% else %}
+            <div class="text-center text-muted mt-5">
+                <i class="fas fa-inbox fa-2x mb-3"></i>
+                <p>Waiting for cron output...</p>
+                <p>Try adding a job or running the test button.</p>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% if scripts %}
+<div class="card shadow-sm mb-4 job-card">
+    <div class="card-header bg-success text-white">
+        <i class="fas fa-file-code me-1"></i> Available Python Scripts
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for script in scripts %}
+            <div class="col-md-4 mb-2">
+                <div class="d-flex justify-content-between align-items-center p-2 border border-secondary rounded bg-dark">
+                    <code class="text-light">{{ script }}</code>
+                    <form method="POST" action="{{ url_for('run_script') }}" class="d-inline">
+                        <input type="hidden" name="script_name" value="{{ script }}">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-play me-1"></i>Run
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow-sm job-card">
+            <div class="card-header bg-info text-white">
+                <i class="fas fa-bolt me-1"></i> Quick Actions
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('add_job') }}" class="btn btn-success">
+                        <i class="fas fa-plus-circle me-2"></i>Add New Job
+                    </a>
+                    <a href="{{ url_for('create_sample_script') }}" class="btn btn-outline-info">
+                        <i class="fas fa-file-code me-2"></i>Create Sample Script
+                    </a>
+                    <a href="{{ url_for('job_history') }}" class="btn btn-outline-warning">
+                        <i class="fas fa-history me-2"></i>View Job History
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm job-card">
+            <div class="card-header bg-warning text-dark">
+                <i class="fas fa-shield-alt me-1"></i> System Status
+            </div>
+            <div class="card-body">
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>Anacron Active</strong>
+                    <p class="mb-0 small">Jobs will run even when system is offline</p>
+                </div>
+                <div class="alert alert-info">
+                    <i class="fas fa-envelope me-2"></i>
+                    <strong>Email Notifications</strong>
+                    <p class="mb-0 small">Configured and ready</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Initialize log streaming
+document.addEventListener("DOMContentLoaded", () => {
+    const outputBox = document.getElementById("outputBox");
+    if (outputBox) {
+        const eventSource = new EventSource("/stream_logs");
+        eventSource.onmessage = (e) => {
+            if (e.data) {
+                // Create new log entry
+                const newEntry = document.createElement('div');
+                
+                // Color code based on content
+                if (e.data.includes('❌') || e.data.toLowerCase().includes('error')) {
+                    newEntry.className = 'text-danger';
+                } else if (e.data.includes('✅') || e.data.toLowerCase().includes('success')) {
+                    newEntry.className = 'text-success';
+                } else {
+                    newEntry.className = 'text-light';
+                }
+                
+                newEntry.textContent = e.data;
+                outputBox.appendChild(newEntry);
+                
+                // Scroll to bottom
+                outputBox.scrollTop = outputBox.scrollHeight;
+            }
+        };
+        
+        eventSource.onerror = (e) => {
+            console.error("EventSource failed:", e);
+            // Try to reconnect after 5 seconds
+            setTimeout(() => {
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    location.reload();
+                }
+            }, 5000);
+        };
+    }
+});
+
+function clearLogs() {
+    if (confirm("Are you sure you want to clear all logs?")) {
+        fetch("/clear_logs").then(() => {
+            const outputBox = document.getElementById("outputBox");
+            outputBox.innerHTML = '<div class="text-center text-muted mt-5"><i class="fas fa-broom fa-2x mb-3"></i><p>Logs cleared successfully</p><p>Waiting for new output...</p></div>';
+        });
+    }
+}
+
+// Auto-refresh jobs every 30 seconds
+setInterval(() => {
+    // You can add auto-refresh logic here if needed
+}, 30000);
+</script>
+
+{% endblock %}

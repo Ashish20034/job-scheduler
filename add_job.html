@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-lg job-card">
+            <div class="card-header card-gradient-primary">
+                <i class="fas fa-plus-circle me-2"></i> Add New Anacron Job
+                <span class="badge bg-warning float-end">Offline Capable</span>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-warning">Schedule (cron syntax)</label>
+                        <input name="schedule" class="form-control form-control-lg" placeholder="* * * * *" required>
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Format: <code>minute hour day month weekday</code><br>
+                            Examples: 
+                            <code>0 * * * *</code> (hourly),
+                            <code>0 0 * * *</code> (daily),
+                            <code>0 0 * * 0</code> (weekly)
+                        </small>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-info">Command</label>
+                        <input name="command" class="form-control form-control-lg" placeholder='test_script.py or echo "Hello"' required>
+                        <small class="text-muted">
+                            <i class="fas fa-code me-1"></i>
+                            For Python scripts: just enter the script name (e.g., <code>test_script.py</code>)<br>
+                            For shell commands: enter the full command
+                        </small>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="email_notifications" id="emailNotifications" checked>
+                            <label class="form-check-label text-success fw-bold" for="emailNotifications">
+                                <i class="fas fa-envelope me-1"></i> Enable Email Notifications
+                            </label>
+                        </div>
+                        <small class="text-muted">
+                            Receive email alerts when jobs are added and executed successfully
+                        </small>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>Anacron Advantage:</strong> This job will run even when your system is offline. 
+                        It will execute when the system comes back online.
+                    </div>
+
+                    <button class="btn btn-success btn-lg w-100 pulse-animation">
+                        <i class="fas fa-save me-2"></i>Save Anacron Job
+                    </button>
+                    
+                    <div class="mt-3 text-center">
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        {% if scripts %}
+        <div class="card shadow-sm job-card mb-4">
+            <div class="card-header card-gradient-info">
+                <i class="fas fa-file-code me-2"></i> Available Scripts
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Click to use in command field:</p>
+                <div class="list-group">
+                    {% for script in scripts %}
+                    <button type="button" class="list-group-item list-group-item-action bg-dark text-light border-secondary script-item" 
+                            onclick="document.querySelector('input[name=\"command\"]').value = '{{ script }}'">
+                        <i class="fas fa-play text-success me-2"></i>
+                        <code>{{ script }}</code>
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="card shadow-sm job-card">
+            <div class="card-header card-gradient-warning">
+                <i class="fas fa-graduation-cap me-2"></i> Anacron & Cron Guide
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6 class="text-warning">🕒 Cron Syntax</h6>
+                    <small class="text-muted">
+                        <strong>Field order:</strong><br>
+                        <code>minute hour day month weekday</code><br><br>
+                    </small>
+                </div>
+                
+                <div class="mb-3">
+                    <h6 class="text-info">⚡ Anacron Benefits</h6>
+                    <small class="text-muted">
+                        • Runs jobs even after system shutdown<br>
+                        • Perfect for laptops and desktops<br>
+                        • Automatic catch-up on missed jobs<br>
+                        • Email notifications for all events
+                    </small>
+                </div>
+                
+                <div>
+                    <h6 class="text-success">📧 Email Features</h6>
+                    <small class="text-muted">
+                        • Job added confirmation<br>
+                        • Execution success alerts<br>
+                        • Detailed job reports<br>
+                        • System status updates
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Add some interactive effects
+document.addEventListener('DOMContentLoaded', function() {
+    const scheduleInput = document.querySelector('input[name="schedule"]');
+    const commandInput = document.querySelector('input[name="command"]');
+    
+    // Add focus effects
+    [scheduleInput, commandInput].forEach(input => {
+        input.addEventListener('focus', function() {
+            this.parentElement.classList.add('border', 'border-warning', 'rounded', 'p-2');
+        });
+        
+        input.addEventListener('blur', function() {
+            this.parentElement.classList.remove('border', 'border-warning', 'rounded', 'p-2');
+        });
+    });
+});
+</script>
+{% endblock %}
